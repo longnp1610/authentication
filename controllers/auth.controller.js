@@ -3,6 +3,7 @@ const bcrypt = require("bcryptjs");
 const db = require("../models");
 const User = db.user;
 const Role = db.role;
+const config = require("../configs/db.config");
 
 exports.signup = async (req, res, next) => {
   const user = await new User({
@@ -16,7 +17,7 @@ exports.signup = async (req, res, next) => {
       res.status(500).send({ message: err.message });
       return;
     }
-    // ADD USER ROLE
+    // ALSO ADD USER ROLE
     Role.findOne({ name: "user" }).exec((err, role) => {
       if (err) {
         res.status(500).send({ message: err.message });
@@ -35,4 +36,37 @@ exports.signup = async (req, res, next) => {
   });
 };
 
-exports.signin = () => {};
+exports.signin = (req, res, next) => {
+  User.findOne({ username: req.body.username })
+    .populate("roles") // JOIN ROLES TABLE
+    .exec((err, user) => {
+      if (err) return handleError(err);
+      if (!user) return res.status(404).send({ message: "User not found." });
+
+      let passwordIsValid = bcrypt.compareSync(
+        req.body.password,
+        user.password
+      );
+
+      if (!passwordIsValid)
+        return res
+          .status(401)
+          .send({ accessToken: null }, { message: "Invalid Password!" });
+
+      let token = jwt.sign({ id: user.id }, config.SECRET_KEY, {
+        expiresIn: "1hr",
+      });
+
+      let authorities = [];
+      for (let i = 0; i < user.roles.length; i++) {
+        authorities.push("ROLE_" + user.roles[i].name.toUpperCase());
+      }
+      res.status(200).send({
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        roles: authorities,
+        accessToken: token,
+      });
+    });
+};
