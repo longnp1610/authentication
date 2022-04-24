@@ -3,7 +3,7 @@ const bcrypt = require("bcryptjs");
 const db = require("../models");
 const User = db.user;
 const Role = db.role;
-const config = require("../configs/db.config");
+const authConfig = require("../configs/auth.config");
 
 exports.signup = async (req, res, next) => {
   const user = await new User({
@@ -53,8 +53,8 @@ exports.signin = (req, res, next) => {
           .status(401)
           .send({ accessToken: null }, { message: "Invalid Password!" });
 
-      let token = jwt.sign({ id: user.id }, config.SECRET_KEY, {
-        expiresIn: "1hr",
+      let token = jwt.sign({ id: user.id }, authConfig.SECRET_KEY, {
+        expiresIn: authConfig.jwtExpireIn,
       });
 
       let authorities = [];
