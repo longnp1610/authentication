@@ -3,9 +3,10 @@ const bcrypt = require("bcryptjs");
 const db = require("../models");
 const User = db.user;
 const Role = db.role;
+const RefreshToken = db.refreshToken;
 const authConfig = require("../configs/auth.config");
 
-exports.signup = async (req, res, next) => {
+const signup = async (req, res, next) => {
   const user = await new User({
     username: req.body.username,
     email: req.body.email,
@@ -36,14 +37,14 @@ exports.signup = async (req, res, next) => {
   });
 };
 
-exports.signin = (req, res, next) => {
+const signin = async (req, res, next) => {
   User.findOne({ username: req.body.username })
     .populate("roles") // JOIN ROLES TABLE
-    .exec((err, user) => {
+    .exec(async (err, user) => {
       if (err) return handleError(err);
       if (!user) return res.status(404).send({ message: "User not found." });
 
-      let passwordIsValid = bcrypt.compareSync(
+      const passwordIsValid = bcrypt.compareSync(
         req.body.password,
         user.password
       );
@@ -53,9 +54,11 @@ exports.signin = (req, res, next) => {
           .status(401)
           .send({ accessToken: null }, { message: "Invalid Password!" });
 
-      let token = jwt.sign({ id: user.id }, authConfig.SECRET_KEY, {
+      const token = jwt.sign({ id: user.id }, authConfig.SECRET_KEY, {
         expiresIn: authConfig.jwtExpireIn,
       });
+
+      const refreshToken = await RefreshToken.createToken(user);
 
       let authorities = [];
       for (let i = 0; i < user.roles.length; i++) {
@@ -67,6 +70,11 @@ exports.signin = (req, res, next) => {
         email: user.email,
         roles: authorities,
         accessToken: token,
+        refreshToken: refreshToken,
       });
     });
 };
+
+const refreshToken = (req, res, next) => {};
+
+module.exports = { signin, signup, refreshToken };

@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 const authConfig = require("../configs/auth.config");
-const { uuidv4 } = require("uuid");
+const { v4: uuidv4 } = require("uuid");
 
 const RefreshTokenSchema = new mongoose.Schema({
   token: String,
@@ -12,16 +12,15 @@ const RefreshTokenSchema = new mongoose.Schema({
 });
 
 RefreshTokenSchema.statics.createToken = async (user) => {
-  let expireAt = new Date();
-  expireAt.setSeconds(expireAt.getSeconds() + authConfig.jwtRefeshExpireIn);
-  let _token = uuidv4();
-  let _object = new this({
+  const expiredAt = new Date();
+  expiredAt.setSeconds(expiredAt.getSeconds() + authConfig.jwtRefeshExpireIn);
+  const _token = uuidv4();
+  const _obj = await saveObject({
     token: _token,
-    user: user_id,
-    expireDate: expireAt.getTime(),
+    user: user._id,
+    expiredDate: expiredAt.getTime(),
   });
-  let refreshToken = await _object.save();
-  return refreshToken.token;
+  return _obj;
 };
 
 RefreshTokenSchema.statics.verifyExpiration = (token) => {
@@ -29,5 +28,19 @@ RefreshTokenSchema.statics.verifyExpiration = (token) => {
 };
 
 const RefreshToken = mongoose.model("RefreshToken", RefreshTokenSchema);
+
+/**
+ *
+ * @param {object} input The input param just like the models
+ * @param {string} input.token
+ * @param {ObjectId} input.user
+ * @param {Date} input.expireDate
+ */
+
+const saveObject = async (input) => {
+  const refreshToken = await new RefreshToken(input);
+  const result = await refreshToken.save();
+  return result.token;
+};
 
 module.exports = RefreshToken;
