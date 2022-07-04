@@ -54,7 +54,7 @@ const signin = async (req, res, next) => {
           .status(401)
           .send({ accessToken: null }, { message: "Invalid Password!" });
 
-      const token = jwt.sign({ id: user.id }, authConfig.SECRET_KEY, {
+      const accessToken = jwt.sign({ id: user.id }, authConfig.SECRET_KEY, {
         expiresIn: authConfig.jwtExpireIn,
       });
 
@@ -64,17 +64,61 @@ const signin = async (req, res, next) => {
       for (let i = 0; i < user.roles.length; i++) {
         authorities.push("ROLE_" + user.roles[i].name.toUpperCase());
       }
-      res.status(200).send({
+      res.status(200).json({
         id: user._id,
         username: user.username,
         email: user.email,
         roles: authorities,
-        accessToken: token,
+        accessToken: `Bearer ${accessToken}`,
         refreshToken: refreshToken,
       });
     });
 };
 
-const refreshToken = (req, res, next) => {};
+const refreshToken = async (req, res, next) => {
+  const { refreshToken } = req.body;
+  if (!refreshToken) {
+    return res.status(403).json({ message: "Refresh token is required" });
+  }
+  try {
+    await RefreshToken.findOne({ token: refreshToken }).exec(
+      (err, refreshToken) => {
+        if (err) res.status(500).send({ message: err });
+        if (!refreshToken) {
+          res
+            .status(403)
+            .json({ message: "Refresh token is not in database!" });
+          return;
+        }
+
+        // CHECK REFRESH TOKEN IS EXPIRED
+        if (RefreshToken.verifyExpiration(refreshToken)) {
+          RefreshToken.findByIdAndRemove(refreshToken._id, {
+            useFindAndModify: false,
+          }).exec();
+
+          res.status(403).json({
+            message:
+              "Refresh token was expired. Please make a new signin request",
+          });
+          return;
+        }
+
+        const newAccessToken = jwt.sign(
+          { id: refreshToken.user._id },
+          authConfig.SECRET_KEY,
+          { expiresIn: authConfig.jwtExpireIn }
+        );
+
+        return res.status(200).json({
+          accessToken: `Bearer ${newAccessToken}`,
+          refreshToken: refreshToken.token,
+        });
+      }
+    );
+  } catch (err) {
+    return res.status(500).send({ message: err });
+  }
+};
 
 module.exports = { signin, signup, refreshToken };

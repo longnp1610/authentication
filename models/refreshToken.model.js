@@ -8,11 +8,11 @@ const RefreshTokenSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
   },
-  expireDate: Date,
+  expiredDate: Date,
 });
 
 RefreshTokenSchema.statics.createToken = async (user) => {
-  const expiredAt = new Date();
+  let expiredAt = new Date();
   expiredAt.setSeconds(expiredAt.getSeconds() + authConfig.jwtRefeshExpireIn);
   const _token = uuidv4();
   const _obj = await saveObject({
@@ -24,7 +24,7 @@ RefreshTokenSchema.statics.createToken = async (user) => {
 };
 
 RefreshTokenSchema.statics.verifyExpiration = (token) => {
-  return token.expireDate.getTime() < new Date().getTime();
+  return token.expiredDate.getTime() < new Date().getTime();
 };
 
 const RefreshToken = mongoose.model("RefreshToken", RefreshTokenSchema);
@@ -34,7 +34,7 @@ const RefreshToken = mongoose.model("RefreshToken", RefreshTokenSchema);
  * @param {object} input The input param just like the models
  * @param {string} input.token
  * @param {ObjectId} input.user
- * @param {Date} input.expireDate
+ * @param {Date} input.expiredDate
  */
 
 const saveObject = async (input) => {
